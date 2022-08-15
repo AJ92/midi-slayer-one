@@ -31,7 +31,9 @@ class VirtualSwitch : public Iio{
     }
 
     virtual bool isChanged(){
-      return mChanged;
+      bool change = mChanged;
+      mChanged = false;
+      return change;
     }
 
     virtual int getValue(){

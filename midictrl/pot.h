@@ -5,10 +5,11 @@
 
 class Pot : public Iio {
   public:
-    explicit Pot(const int pin, const int samples = 4)
+    explicit Pot(const int pin, const int samples = 96, const int debounceMs = 32)
       : Iio(IO_TYPE::IO_INPUT)
       , mPin(pin)
       , mSamples(samples)
+      , mDebounceMs(debounceMs)
     {
       mValues = new int[mSamples];
 
@@ -28,15 +29,13 @@ class Pot : public Iio {
     }
 
     virtual void loop() {
+      pinMode(mPin, INPUT);
+
       int latestValue = analogRead(mPin);
+      //Serial.println(latestValue);
 
-      int latestValueMapped = map(
-        latestValue, 
-        mAnalogMin, mAnalogMax, 
-        mDigitalMin, mDigitalMax
-      );
-
-      mValues[mCurrentIndex] = latestValueMapped;
+      mValues[mCurrentIndex] = latestValue;
+      mCurrentIndex = (++mCurrentIndex) % mSamples;
 
       int val = 0;
       for(int i = 0; i < mSamples; i++){
@@ -44,26 +43,45 @@ class Pot : public Iio {
       }
       val = val / mSamples;
 
-      if(val != mCurrentValue){
-        mChanged = true;
-        mCurrentValue = val;
+      int valueMapped = map(
+        val,
+        mAnalogMin, mAnalogMax, 
+        mDigitalMin, mDigitalMax
+      );
 
-        Serial.println("The slider moved");
-        Serial.println(mCurrentValue);
-      }
-      else{
-        mChanged = false;
+      mCurrentValue = valueMapped;
+
+      if (mCurrentValue != mLastSmoothedFlickerableState) {
+        // reset the debouncing timer
+        mLastDebounceTime = millis();
+        // save the the last flickerable state
+        mLastSmoothedFlickerableState = mCurrentValue;
       }
 
-      mCurrentIndex = (++mCurrentIndex) % mSamples;
+      if (((millis() - mLastDebounceTime) > mDebounceMs) || 
+          (abs(mLastSteadyState - mCurrentValue) > 2) 
+      ) {
+
+        if(mLastSteadyState != mCurrentValue){
+          mChanged = true;
+        }
+        else{
+          mChanged = false;
+        }
+
+        mLastSteadyState = mCurrentValue;
+      }
+  
     }
 
     virtual bool isChanged(){
-      return mChanged;
+      bool change = mChanged;
+      mChanged = false;
+      return change;
     }
 
     virtual int getValue(){
-      return mCurrentValue;
+      return mLastSteadyState;
     }
 
     virtual int getPin(){
@@ -72,11 +90,12 @@ class Pot : public Iio {
 
   private:
     int mPin = -1;
-    int mSamples = 4;
+    int mSamples = 1;
+    int mDebounceMs = 10;
     bool mChanged = false;
 
     int mAnalogMin = 0;
-    int mAnalogMax = 1023;
+    int mAnalogMax = 8191;
 
     int mDigitalMin = 0;
     int mDigitalMax = 127;
@@ -84,5 +103,12 @@ class Pot : public Iio {
     int * mValues;
     int mCurrentValue;
     int mCurrentIndex = 0;
+
+    int mLastSmoothedFlickerableState = 0;
+    int mLastSteadyState = 0;
+
+    // the following variables are unsigned longs because the time, measured in
+    // milliseconds, will quickly become a bigger number than can be stored in an int.
+    unsigned long mLastDebounceTime = 0;  // the last time the pot's smoothed value changed
 };
 #endif

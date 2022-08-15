@@ -5,11 +5,11 @@ void readEncoder(int interruptId) {
   Serial.println(interruptId);
   int dtValue = digitalRead(rotEnc->getPinDT());
   if (dtValue == HIGH) {
-    Serial.println("Rotated clockwise ⏩");
+    //Serial.println("Rotated clockwise ⏩");
     rotEnc->getSwitchRight().setPressed(true);
   }
   if (dtValue == LOW) {
-    Serial.println("Rotated counterclockwise ⏪");
+    //Serial.println("Rotated counterclockwise ⏪");
     rotEnc->getSwitchLeft().setPressed(true);
   }
 }

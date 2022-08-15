@@ -41,14 +41,18 @@ class Controller{
     }
 
     void loop(){
+      //get the values as fast as possible
+      inputLoop();
+      midiLoop();
+    };
+
+    void inputLoop(){
       //max analog rot pot value 8191.0
       //max digital output value 127.0
 
       for(int i = 0; i < mIoCount; i++){
         IOStruct * ioStruct = mIoList[i];
-
         Iio * io = ioStruct->io;
-
         // if a multiplexer is assigned, set it up first
         Multiplexer * multiplexer = ioStruct->multiplexer;
 
@@ -61,15 +65,34 @@ class Controller{
           if(io->isChanged()){
             uint8_t controller = 1 + static_cast<uint8_t>(i);
             uint8_t value = static_cast<uint8_t>(io->getValue());
-            sendValue(value, controller, mChannel);
+
+            mMidiController[mCurrentMessage] = controller;
+            mMidiValues[mCurrentMessage] = value;
+
+            mCurrentMessage++;
+            if(mCurrentMessage >= mMaxMessageBuffer){
+              mCurrentMessage = 0;
+            }
+
+            if(mCurrentMessage == mWrittenMessage){
+              Serial.println("buffer overflow");
+            }
           }
         }
         else{
           // OUTPUT current not implemented...
         }
-
       }
+    }
 
+    void midiLoop(){
+      while(mWrittenMessage != mCurrentMessage){
+        sendValue( mMidiValues[mWrittenMessage], mMidiController[mWrittenMessage], mChannel);
+        mWrittenMessage++;
+        if(mWrittenMessage >= mMaxMessageBuffer){
+          mWrittenMessage = 0;
+        }
+      }
     }
 
   private:
@@ -93,11 +116,18 @@ class Controller{
     // midi channel ( usually stays at 0 )
     uint8_t mChannel = 0;
 
-
     int mIoCount = 0;
     int mMaxIos = 127;
 
     // each io can have a multiplexer assigned
     IOStruct ** mIoList;
+
+    // buffer messages
+    uint8_t mCurrentMessage = 0U;
+    uint8_t mWrittenMessage = 0U;
+    uint8_t mMaxMessageBuffer = 64;
+    uint8_t * mMidiController = new uint8_t[mMaxMessageBuffer];
+    uint8_t * mMidiValues = new uint8_t[mMaxMessageBuffer];
+
 };
 #endif

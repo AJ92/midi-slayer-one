@@ -5,16 +5,21 @@
 
 class Btn : public Iio{
   public:
-    explicit Btn(int pin, int debounceMs = 50)
+    explicit Btn(const int pin, const int debounceMs = 32)
       : Iio(IO_TYPE::IO_INPUT)
       , mPin(pin)
       , mDebounceMs(debounceMs)
     {
-      pinMode(mPin, INPUT_PULLDOWN);
+      
     }
 
     virtual void loop() {
+      pinMode(mPin, INPUT_PULLUP);
+
+      //Serial.print("btn loop ");
+
       mCurrentState = digitalRead(mPin);
+      //Serial.println(mCurrentState);
 
       // check to see if you just pressed the button
       // (i.e. the input went from LOW to HIGH), and you've waited long enough
@@ -34,12 +39,15 @@ class Btn : public Iio{
 
         // if the button state has changed:
         if (mLastSteadyState == HIGH && mCurrentState == LOW){
-          Serial.println("The button is pressed");
+          //Serial.println("The button is pressed");
           mChanged = true;
         }
         else if (mLastSteadyState == LOW && mCurrentState == HIGH){
-          Serial.println("The button is released");
+          //Serial.println("The button is released");
           mChanged = true;
+        }
+        else{
+          mChanged = false;
         }
 
         // save the the last steady state
@@ -47,14 +55,16 @@ class Btn : public Iio{
       }
 
       if(mLastSteadyState == HIGH){
-        mPressed = true;
-      }
-      else{
         if(mPressed){
           mReleased = true;
         }
         mPressed = false;
       }
+      else{
+        mPressed = true;
+      }
+
+      //pinMode(mPin, INPUT_PULLDOWN);
     }
 
     bool isPressed(){
@@ -68,14 +78,16 @@ class Btn : public Iio{
     }
 
     virtual bool isChanged(){
-      return mChanged;
+      bool change = mChanged;
+      mChanged = false;
+      return change;
     }
 
     virtual int getValue(){
-      if(mCurrentState == HIGH){
-        return 1;
+      if(mLastSteadyState == HIGH){
+        return 0; // release
       }
-      return 0;
+      return 1; // press
     }
 
     virtual int getPin(){

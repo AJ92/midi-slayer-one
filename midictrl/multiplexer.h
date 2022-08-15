@@ -20,10 +20,15 @@ class Multiplexer {
       , mPinS3(pinS3)
     {
       mChannelSelectPins = new int[4];
-      mChannelSelectPins[0] = pinS0;
-      mChannelSelectPins[1] = pinS1;
-      mChannelSelectPins[2] = pinS2;
-      mChannelSelectPins[3] = pinS3;
+      mChannelSelectPins[0] = mPinS0;
+      mChannelSelectPins[1] = mPinS1;
+      mChannelSelectPins[2] = mPinS2;
+      mChannelSelectPins[3] = mPinS3;
+
+      pinMode(mPinS0, OUTPUT); 
+      pinMode(mPinS1, OUTPUT); 
+      pinMode(mPinS2, OUTPUT); 
+      pinMode(mPinS3, OUTPUT); 
 
       // 16 possible inputs/outputs addressed via 4 channel selection bits (pins)
       mChannelValues = new int[16 * 4];
