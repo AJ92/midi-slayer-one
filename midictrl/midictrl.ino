@@ -9,7 +9,8 @@
 #include "led.h"
 #include "ota.h"
 
-Controller controller;
+// 128 IOs reserved
+Controller controller(128);
 
 Multiplexer mp0(5,0 /*unused*/,1,2,3,4);
 Multiplexer mp1(6,0 /*unused*/,1,2,3,4);
@@ -17,7 +18,7 @@ Multiplexer mp2(7,0 /*unused*/,1,2,3,4);
 Multiplexer mp3(8,0 /*unused*/,1,2,3,4);
 
 // mp 0
-Btn b0(5); //@ 0
+Btn b0(5); //@ 0    - used for ota start after boot
 Btn b1(5); //@ 1
 
 Pot p0(5); //@ 2
@@ -93,25 +94,22 @@ Pot p18(8); //@ 11
 Pot p19(8); //@ 12
 Pot p20(8); //@ 13
 
-RotEnc rotEnc1(9, 10, 11, 0);
-RotEnc rotEnc2(12, 13, 16, 1);
+RotEnc rotEnc1(9, 10, 11);
+RotEnc rotEnc2(12, 13, 16);
 
-bool ota = false;
-
-
-//Pot test1(5); //@ 5
-//Pot test2(5); //@ 14
-
+bool otaRunning = false;
+bool calibrationRunning = false;
+bool bootCheck = true;
+unsigned long startTimeMs = 0;
 
 void setup() {
   Serial.begin(115200);
 
+  analogSetAttenuation(ADC_11db);
+
   delay(1000);
 
   Serial.println("midi-slayer-one setup...");
-
-  //controller.addIo(&test1, &mp0, 5);
-  //controller.addIo(&test2, &mp0, 14);
 
   // mp 0
   controller.addIo(&b0, &mp0, 0);
@@ -190,33 +188,51 @@ void setup() {
   controller.addIo(&p19, &mp3, 12);
   controller.addIo(&p20, &mp3, 13);
 
-
   // rot encs
+  controller.addIo(&rotEnc1);
   controller.addIo(&rotEnc1.getButton());
   controller.addIo(&rotEnc1.getSwitchLeft());
   controller.addIo(&rotEnc1.getSwitchRight());
 
+  controller.addIo(&rotEnc2);
   controller.addIo(&rotEnc2.getButton());
   controller.addIo(&rotEnc2.getSwitchLeft());
   controller.addIo(&rotEnc2.getSwitchRight());
 
-  //if b0 is pressed at start go into wifi ota mode
-  mp0.setChannel(0);
-  delay(1);
-  b0.loop();
-  if(b0.isPressed()){
-    Serial.println("holding b0 .");
-  }
-  delay(100);
-  mp0.setChannel(0);
-  b0.loop();
-  if(b0.isPressed()){
-    Serial.println("holding b0 ..");
+  controller.initialize();
+
+  startTimeMs = millis();
+}
+
+void loop()
+{
+  // check after boot if ota update is needed
+  if (bootCheck && ((millis() - startTimeMs) > 5000))
+  {
+    Serial.println("boot check");
+    checkOTA();
+    checkCalibration();
+    bootCheck = false;
   }
 
-  if(b0.isPressed()){
-    Serial.println("Entering OTA");
-    ota = true;
+  if (otaRunning)
+  {
+    handleOTA();
+  }
+  if (calibrationRunning)
+  {
+    handleCalibration();
+  }
+  controller.loop();
+}
+
+// check if ota update is requested and start it if button is pressed
+void checkOTA()
+{
+  if (b3.isPressed() || b0.isPressed())
+  {
+    Serial.println("holding b0 or b3 - ota");
+    otaRunning = true;
     setupOTA();
     setLeds(255);
   }
@@ -225,11 +241,69 @@ void setup() {
   }
 }
 
-void loop() {
-  if(ota){
-    handleOTA();
+unsigned long calibrationTimeMs = 0;
+bool calibrationLedStatus = false;
+
+unsigned long calibrationBlinkTimeSlowMs = 1000;
+unsigned long calibrationBlinkTimeFastMs = 100;
+
+unsigned long calibrationBlinkTimeMs = calibrationBlinkTimeSlowMs;
+
+bool calibrationStarted = false;
+
+void checkCalibration()
+{
+  if (b12.isPressed())
+  {
+    Serial.println("holding b12 - calibration");
+    calibrationRunning = true;
+    calibrationTimeMs = millis();
+    setLeds(255);
   }
-  controller.loop();
+}
+
+void handleCalibration()
+{
+  // LED blinking and mode switch
+  if ((millis() - calibrationTimeMs) > calibrationBlinkTimeMs)
+  {
+    calibrationLedStatus = !calibrationLedStatus;
+    if (calibrationLedStatus)
+    {
+      setLeds(255);
+    }
+    else
+    {
+      setLeds(0);
+    }
+
+    calibrationTimeMs = millis();
+  }
+
+  if (b12.isReleased())
+  {
+    if (!calibrationStarted)
+    {
+      calibrationStarted = true;
+      controller.calibrate(true);
+    }
+    else
+    {
+      calibrationRunning = false;
+      calibrationStarted = false;
+      controller.calibrate(false);
+      setLeds(0);
+    }
+
+    if (calibrationBlinkTimeMs == calibrationBlinkTimeFastMs)
+    {
+      calibrationBlinkTimeMs = calibrationBlinkTimeSlowMs;
+    }
+    else
+    {
+      calibrationBlinkTimeMs = calibrationBlinkTimeFastMs;
+    }
+  }
 }
 
 void setLeds(int val){

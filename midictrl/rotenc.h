@@ -1,22 +1,11 @@
 #ifndef rot_enc_h
 #define rot_enc_h
 #include "Arduino.h"
+#include "iio.h"
 #include "btn.h"
-#include "virtualSwitch.h"
+#include "virtualswitch.h"
 
-class RotEnc;
-
-void readEncoder(int interruptId);
-
-void readEncoder0();
-
-void readEncoder1();
-
-void readEncoder2();
-
-void readEncoder3();
-
-class RotEnc {
+class RotEnc : public Iio{
   public:
     /**
      *  @brief Rotary encoder (left/right/buttonpress)
@@ -25,7 +14,21 @@ class RotEnc {
      *  @param pinSW  SW pin ( button switch ) 
      *  @param debounceMS the button press debounce
      */
-    explicit RotEnc(int pinCLK, int pinDT, int pinSW, int interruptId = 0, int debounceMs = 50);
+  RotEnc(int pinCLK, int pinDT, int pinSW, int debounceMs = 20) 
+      : Iio(IO_TYPE::IO_COMPOSIT)
+      , mButton(pinSW, debounceMs)
+      , mPinCLK(pinCLK)
+      , mPinDT(pinDT)
+      , mPinSW(pinSW)
+    {
+      mSwitchLeft.setValue(1);
+      mSwitchRight.setValue(1);
+
+      pinMode(mPinCLK, INPUT);
+      pinMode(mPinDT, INPUT);
+
+      mPreviousCLKState = digitalRead(mPinCLK);
+    }
 
     Btn& getButton(){
       return mButton;
@@ -39,25 +42,37 @@ class RotEnc {
       return mSwitchRight;
     }
 
-    int getPinDT(){
-      return mPinDT;
+    virtual void loop() {
+      mCurrentCLKState = digitalRead(mPinCLK);
+
+      if(mCurrentCLKState != mPreviousCLKState){
+        if(digitalRead(mPinDT) != mCurrentCLKState){
+          mSwitchLeft.setPressed(true);
+        }
+        else{
+          mSwitchRight.setPressed(true);
+        }
+      }
+
+      mPreviousCLKState = mCurrentCLKState;
     }
+
+    virtual bool isChanged() { return false; }
+
+
 
   private:
     int mPinCLK;
     int mPinDT;
     int mPinSW;
 
-    int mInterruptId;
+    int mCurrentCLKState = 0;
+    int mPreviousCLKState = 0;
 
     Btn mButton;
     VirtualSwitch mSwitchLeft;
     VirtualSwitch mSwitchRight;
 };
 
-namespace {
-  uint8_t * rotenclist = new uint8_t[sizeof(RotEnc*) * 4];
-  RotEnc ** ROT_ENC_INTERRUPT_LIST = (RotEnc**)rotenclist;
-};
 
 #endif

@@ -14,6 +14,8 @@ class Btn : public Iio{
     }
 
     virtual void loop() {
+      mReleased = false;
+
       pinMode(mPin, INPUT_PULLUP);
 
       //Serial.print("btn loop ");
@@ -39,11 +41,11 @@ class Btn : public Iio{
 
         // if the button state has changed:
         if (mLastSteadyState == HIGH && mCurrentState == LOW){
-          //Serial.println("The button is pressed");
+          Serial.println("The button is pressed");
           mChanged = true;
         }
         else if (mLastSteadyState == LOW && mCurrentState == HIGH){
-          //Serial.println("The button is released");
+          Serial.println("The button is released");
           mChanged = true;
         }
         else{
@@ -72,9 +74,7 @@ class Btn : public Iio{
     }
 
     bool isReleased(){
-      bool released = mReleased;
-      mReleased = false;
-      return released;
+      return mReleased;
     }
 
     virtual bool isChanged(){
@@ -102,9 +102,9 @@ class Btn : public Iio{
     bool mChanged = false;
 
     // Variables will change:
-    int mLastSteadyState = LOW;       // the previous steady state from the input pin
-    int mLastFlickerableState = LOW;  // the previous flickerable state from the input pin
-    int mCurrentState = LOW;                // the current reading from the input pin
+    int mLastSteadyState = HIGH;      // the previous steady state from the input pin
+    int mLastFlickerableState = HIGH; // the previous flickerable state from the input pin
+    int mCurrentState = HIGH;         // the current reading from the input pin
 
     // the following variables are unsigned longs because the time, measured in
     // milliseconds, will quickly become a bigger number than can be stored in an int.
